@@ -13,6 +13,7 @@ import android.widget.TextView;
 
 import com.ainirobot.coreservice.client.Definition;
 import com.ainirobot.coreservice.client.RobotApi;
+import com.ainirobot.coreservice.client.listener.CommandListener;
 import com.ainirobot.coreservice.client.listener.TextListener;
 import com.bumptech.glide.Glide;
 import com.sdxxtop.robotproject.adapter.GridAdapter;
@@ -22,6 +23,7 @@ import com.sdxxtop.robotproject.control.RobotPersonInfo;
 import com.sdxxtop.robotproject.global.App;
 import com.sdxxtop.robotproject.global.Constants;
 import com.sdxxtop.robotproject.presenter.iview.SkillView;
+import com.sdxxtop.robotproject.skill.MoveSkill;
 import com.sdxxtop.robotproject.skill.NavigationSkill;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
 import com.sdxxtop.robotproject.utils.FuzzyUtils;
@@ -192,6 +194,21 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
 
     private void register() {
 //        robotPresenter.registerModule();
+        RobotApi.getInstance().resetEstimate(0, new CommandListener() {
+            @Override
+            public void onResult(int result, String message) {
+                super.onResult(result, message);
+                Log.d(TAG, "resetEstimate " + result + " , " + message);
+            }
+        });
+
+        RobotApi.getInstance().isRobotEstimate(0 ,new CommandListener() {
+            @Override
+            public void onResult(int result, String message) {
+                super.onResult(result, message);
+                Log.d(TAG, "isRobotEstimate " + result + " , " + message);
+            }
+        });
     }
 
     private void speaking(boolean speaking) {
@@ -206,7 +223,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
 
     @Override
     public void onSpeechParResult(final String speechMessage) {
-        Log.e(TAG, "onSpeechParResult thread " + Thread.currentThread());
+        Log.e(TAG, "onSpeechParResult speechMessage " + speechMessage);
         if (!TextUtils.isEmpty(speechMessage)) {
             Intent intent = null;
             if ("打开问答".equals(speechMessage) || "开启问答".equals(speechMessage)) {
@@ -244,18 +261,23 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
             else if (!TextUtils.isEmpty(speechMessage) && FuzzyUtils.contains3(speechMessage)) {
                 String answerText = getString(R.string.report_go_position);
                 SpeechSkill.getInstance().playTxt(answerText);
-            }
-
-            else if (!TextUtils.isEmpty(speechMessage) && FuzzyUtils.contains4(speechMessage)) {
+            } else if (!TextUtils.isEmpty(speechMessage) && FuzzyUtils.contains4(speechMessage)) {
                 String answerText = getString(R.string.report_say_bye);
                 SpeechSkill.getInstance().playTxt(answerText);
-            }
-            else if (!TextUtils.isEmpty(speechMessage) && FuzzyUtils.contains7(speechMessage)) {
+            } else if (!TextUtils.isEmpty(speechMessage) && FuzzyUtils.contains7(speechMessage)) {
                 String answerText = getString(R.string.report_laoban);
                 SpeechSkill.getInstance().playTxt(answerText);
-            }
-            else if (speechMessage.contains("带我去展厅") || speechMessage.contains("去展厅")) {
+            } else if (speechMessage.contains("带我去展厅") || speechMessage.contains("去展厅")) {
                 navigation("展厅");
+            } else if (speechMessage.contains("退出导航")) {
+                handler.removeMessages(START_SEARCH_PEOPLE);
+                RobotApi.getInstance().stopNavigation(0);
+                SpeechSkill.getInstance().playTxt("退出导航成功", new TextListener() {
+                    @Override
+                    public void onComplete() {
+                        super.onComplete();
+                    }
+                });
             }
 
 ////            //大门、展厅、电梯口
@@ -296,17 +318,17 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
             }
         });
 
-        Log.e(TAG, "onStartSkill thread " + Thread.currentThread());
+//        Log.e(TAG, "onStartSkill thread " + Thread.currentThread());
     }
 
     @Override
     public void onStopSkill() {
-        Log.e(TAG, "onStopSkill thread " + Thread.currentThread());
+//        Log.e(TAG, "onStopSkill thread " + Thread.currentThread());
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 speaking(false);
-
+                Log.e(TAG, "onStopSkill 判断是否是说话完毕 ");
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -333,12 +355,12 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
 
     @Override
     public void onVolumeChange(int volume) {
-        Log.e(TAG, "onVolumeChange thread " + Thread.currentThread());
+//        Log.e(TAG, "onVolumeChange thread " + Thread.currentThread());
     }
 
     @Override
     public void onQueryEnded(int query) {
-        Log.e(TAG, "onQueryEnded thread " + Thread.currentThread() + " query: " + query);
+//        Log.e(TAG, "onQueryEnded thread " + Thread.currentThread() + " query: " + query);
     }
 
     @Override

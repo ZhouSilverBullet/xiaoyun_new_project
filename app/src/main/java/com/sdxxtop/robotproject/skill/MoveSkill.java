@@ -41,12 +41,12 @@ public class MoveSkill extends BaseSkill {
         RobotApi.getInstance().goBackward(Constants.REQUEST_ID_DEFAULT, speed, distance, listener);
     }
 
-    public void turnLeft(int reqId, float speed, float distance, CommandListener listener) {
-
+    public void turnLeft(float speed, float distance, CommandListener listener) {
+        RobotApi.getInstance().turnLeft(Constants.REQUEST_ID_DEFAULT, 30f, 60f, listener);
     }
 
-    public void turnRight(int reqId, float speed, float distance, CommandListener listener) {
-
+    public void turnRight(float speed, float distance, CommandListener listener) {
+        RobotApi.getInstance().turnRight(Constants.REQUEST_ID_DEFAULT, 30, 60f, listener);
     }
 
     public void motionArc(int reqId, float lineSpeed, float angularSpeed, CommandListener listener) {

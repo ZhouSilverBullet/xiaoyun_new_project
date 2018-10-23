@@ -34,6 +34,7 @@ public class NavigationSkill extends BaseSkill {
 
     public void startNavigation(final String destination, final NavigationCallback callback) {
         RobotApi.getInstance().stopFocusFollow(0);
+        RobotApi.getInstance().resetHead(0, new CommandListener());
         RobotApi.getInstance().startNavigation(Constants.REQUEST_ID_DEFAULT, destination,
                 Constants.COORDINATE_DEVIATION, Constants.START_NAVIGATION_TIME_OUT,
                 new ActionListener() {
@@ -41,6 +42,61 @@ public class NavigationSkill extends BaseSkill {
                     public void onError(int errorCode, String errorString) throws RemoteException {
                         Log.e(TAG, "onError: " + errorCode + ", " + errorString);
                         stopNavigation();
+                        switch (errorCode) {
+                            case Definition.ERROR_NOT_ESTIMATE:
+                                playText("当前未定位");
+                                RobotApi.getInstance().isRobotEstimate(0 ,new CommandListener() {
+                                    @Override
+                                    public void onResult(int result, String message) {
+                                        super.onResult(result, message);
+                                        Log.d(TAG, "isRobotEstimate " + result + " , " + message);
+                                        switch (result) {
+                                            case Definition.RESULT_OK:
+                                                playText("定位成功" + message);
+                                                break;
+                                            default:
+                                                playText("定位失败" + message);
+                                                break;
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onStatusUpdate(int status, String data) {
+                                        super.onStatusUpdate(status, data);
+                                        Log.d(TAG, "isRobotEstimate onStatusUpdate " + status + " , " + data);
+                                    }
+                                });
+//                                RobotApi.getInstance().resetEstimate(0, new CommandListener() {
+//                                    @Override
+//                                    public void onResult(int result, String message) {
+//                                        super.onResult(result, message);
+//                                        switch (result) {
+//                                            case Definition.RESULT_OK:
+//                                                playText("定位成功" + message);
+//                                                break;
+//                                            default:
+//                                                playText("定位失败" + message);
+//                                                break;
+//                                        }
+//                                    }
+//                                });
+                                break;
+                            case Definition.ERROR_IN_DESTINATION:
+                                playText("已经在目的地范围，目标点范围通过参数设置");
+                                break;
+                            case Definition.ERROR_DESTINATION_NOT_EXIST:
+                                playText("目的地不存在");
+                                break;
+                            case Definition.ERROR_DESTINATION_CAN_NOT_ARRAIVE:
+                                playText("避障超时，目的地不能到达");
+                                break;
+                            case Definition.ACTION_RESPONSE_ALREADY_RUN:
+                                playText("当前Action正在运行");
+                                break;
+                            case Definition.ACTION_RESPONSE_REQUEST_RES_ERROR:
+                                playText("资源被占用");
+                                break;
+                        }
                     }
 
                     @Override
@@ -75,8 +131,26 @@ public class NavigationSkill extends BaseSkill {
                     @Override
                     public void onStatusUpdate(int status, String data) throws RemoteException {
                         Log.e(TAG, "onResult: " + status + ", " + data);
+                        switch (status) {
+                            case Definition.STATUS_GOAL_OCCLUDED:
+                                playText("目标点被占用");
+                                break;
+                            case Definition.STATUS_GOAL_OCCLUDED_END:
+                                playText("目标点被占用，导航结束");
+                                break;
+                            case Definition.STATUS_NAVI_AVOID:
+                                playText("障碍物堵住行进行路线");
+                                break;
+                            case Definition.STATUS_NAVI_AVOID_END:
+                                playText("障碍物移除");
+                                break;
+                        }
                     }
                 });
+    }
+
+    public void playText(String speechValue) {
+        SpeechSkill.getInstance().playTxt(speechValue);
     }
 
     public void prepareStartNavigation(final String destination, final NavigationCallback callback) {

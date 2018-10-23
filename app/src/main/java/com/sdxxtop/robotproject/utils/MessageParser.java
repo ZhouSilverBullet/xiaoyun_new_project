@@ -179,6 +179,9 @@ public class MessageParser {
     public static String getAnswerText(String json) {
         String answerText = "";
         try {
+            if (TextUtils.isEmpty(json)) {
+                return answerText;
+            }
             JSONObject object = new JSONObject(json);
             answerText = object.optString("answerText");
         } catch (JSONException e) {
@@ -206,6 +209,23 @@ public class MessageParser {
             JSONObject object = new JSONObject(json);
             JSONObject jsonObject = new JSONObject(object.optString("slots"));
             JSONArray jsonArray = jsonObject.optJSONArray("destination");
+            JSONObject info = (JSONObject) jsonArray.get(0);
+            if (info != null) {
+                destination = info.optString("value");
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return destination;
+    }
+
+    public static String getMove(String json) {
+        String destination = "";
+        try {
+            JSONObject object = new JSONObject(json);
+            JSONObject jsonObject = new JSONObject(object.optString("slots"));
+            JSONArray jsonArray = jsonObject.optJSONArray("direction");
             JSONObject info = (JSONObject) jsonArray.get(0);
             if (info != null) {
                 destination = info.optString("value");

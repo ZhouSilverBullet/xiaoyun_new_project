@@ -31,6 +31,7 @@ public class Constants {
     public static final String REQUEST_TYPE_SET_LOCATION = "robot_navigation&set_location";
     public static final String REQUEST_TYPE_ASK = "register&ask";
     public static final String REQUEST_TYPE_REGISTER = "register&register";
+    public static final String REQUEST_TYPE_MOVE = "motion&move";
 
     // callback type
     /**

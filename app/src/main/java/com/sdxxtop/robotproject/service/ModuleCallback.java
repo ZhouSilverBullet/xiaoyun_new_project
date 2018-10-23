@@ -29,7 +29,7 @@ public class ModuleCallback extends ModuleCallbackApi {
 
     @Override
     public boolean onSendRequest(int reqId, String reqType, String reqText, String reqParam) {
-        Log.e(TAG, "New request: " + " type is:" + reqType + " text is:" + reqText + " reqParam = " + reqParam);
+        Log.e(TAG, "New request: " + "reqId: " + reqId + " type is:" + reqType + " text is:" + reqText + " reqParam = " + reqParam);
         Message msg = Message.obtain();
         Bundle bundle = new Bundle();
         bundle.putInt(Constants.BUNDLE_ID, reqId);
@@ -37,7 +37,8 @@ public class ModuleCallback extends ModuleCallbackApi {
         bundle.putString(Constants.BUNDLE_REQUEST_TEXT, reqText);
         bundle.putString(Constants.BUNDLE_REQUEST_PARAM, reqParam);
         msg.setData(bundle);
-        MessageManager.getInstance().exeRequest(msg);
+//        MessageManager.getInstance().exeRequest(msg);
+        MessageManager.getInstance().getHandler().sendMessage(msg);
         return true;
     }
 

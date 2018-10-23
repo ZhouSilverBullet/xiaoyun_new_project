@@ -1,6 +1,7 @@
 package com.sdxxtop.robotproject.control;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Message;
 import android.os.RemoteException;
 import android.text.TextUtils;
@@ -15,7 +16,10 @@ import com.ainirobot.coreservice.client.listener.TextListener;
 import com.sdxxtop.robotproject.R;
 import com.sdxxtop.robotproject.global.App;
 import com.sdxxtop.robotproject.global.Constants;
+import com.sdxxtop.robotproject.presenter.MessageManagerPresenter;
 import com.sdxxtop.robotproject.skill.FaceSkill;
+import com.sdxxtop.robotproject.skill.MoveSkill;
+import com.sdxxtop.robotproject.skill.NavigationSkill;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
 import com.sdxxtop.robotproject.utils.FuzzyUtils;
 import com.sdxxtop.robotproject.utils.MessageParser;
@@ -36,17 +40,17 @@ import java.util.List;
  * @author Orion
  * @time 2018/9/14
  */
-public class MessageManager {
+public class MessageManager implements Handler.Callback {
 
+    private final MessageManagerPresenter managerPresenter;
+    private final Handler handler;
     private List<MessageCallBack> callbackList;
     private static final String TAG = "MessageManager";
 
-    boolean isSpeaking;
-    private PersonInfoListener askPersonInfoListener;
-    private PersonInfoListener wakeUpPersonInfoListener;
-
     private MessageManager() {
         callbackList = new ArrayList<>();
+        managerPresenter = new MessageManagerPresenter();
+        handler = new Handler(this);
     }
 
     public static MessageManager getInstance() {
@@ -55,6 +59,16 @@ public class MessageManager {
 
     private static class SingleHolder {
         public static final MessageManager INSTANCE = new MessageManager();
+    }
+
+    public Handler getHandler() {
+        return handler;
+    }
+
+    @Override
+    public boolean handleMessage(Message message) {
+        exeRequest(message);
+        return true;
     }
 
     public void exeRequest(Message msg) {
@@ -70,36 +84,7 @@ public class MessageManager {
 
         switch (type) {
             case Constants.REQUEST_TYPE_SPEECH:
-                SpeechSkill.getInstance().setPlaying(false);
-
-                //你们请注意我们的实现逻辑   当喊他的时候  先头转  如果找到人   交点跟随  ，然后身体转动
-                // FIXME: 2018/9/20 需要地盘同步转动  //relative absolute
-                FaceSkill.getInstance().stopFocusFollow();
-                RobotApi.getInstance().stopSearchPerson(0);
-                RobotApi.getInstance().stopWakeUp(0);
-                stopGetAllPersonInfo();
-
-                final Integer angle = Integer.valueOf(param);
-                Log.e(TAG, " exeRequest angle :" + angle);
-                RobotApi.getInstance().wakeUp(Constants.REQUEST_ID_DEFAULT, angle, new ActionListener() {
-                    @Override
-                    public void onResult(int status, String responseString) throws RemoteException {
-                        super.onResult(status, responseString);
-                        switch (status) {
-                            case 1:
-                                RobotApi.getInstance().stopWakeUp(0);
-                                PersonInfo.getInstance().startSearchPerson();
-                                break;
-                        }
-                    }
-
-                    @Override
-                    public void onError(int errorCode, String errorString) throws RemoteException {
-                        super.onError(errorCode, errorString);
-
-                        Log.e(TAG, "wakeUp onError errorCode :" + errorCode + ", " + errorString);
-                    }
-                });
+                managerPresenter.requestTypeSpeechWakeup(param);
 
 //                RobotApi.getInstance().wakeUp(Constants.REQUEST_ID_DEFAULT, angle, new ActionListener() {
 //                    @Override
@@ -184,89 +169,17 @@ public class MessageManager {
 //                String location = MessageParser.getLocation(param);
 //                NavigationSkill.getInstance().setLocation(location);
                 break;
-            case Constants.REQUEST_TYPE_ASK:
+            case Constants.REQUEST_TYPE_MOVE:
+                Log.d(TAG, "REQUEST_TYPE_MOVE: 调用成功！");
+                String destination = MessageParser.getMove(param);
                 FaceSkill.getInstance().stopFocusFollow();
-                stopGetAllPersonInfo();
-                isSpeaking = false;
-                askPersonInfoListener = new PersonInfoListener() {
-                    @Override
-                    public void onResult(int status, String responseString) {
-                        super.onResult(status, responseString);
-                        stopGetAllPersonInfo();
-                        Log.e(TAG, "startGetAllPersonInfo status : " + status + " onStatusUpdate: " + responseString);
-                    }
+//                RobotApi.getInstance().stopGetAllPersonInfo(0, null);
+                managerPresenter.requestTypeMove(destination);
 
-                    @Override
-                    public void onData(int code, List<Person> data) {
-                        super.onData(code, data);
-                        ArrayList<String> list = new ArrayList<>();
-                        for (Person datum : data) {
-                            list.add(datum.toGson());
-                            final int id = datum.getId();
-                            RobotApi.getInstance().getPictureById(0, id, 1, new CommandListener() {
-                                @Override
-                                public void onResult(int result, String message) {
-                                    super.onResult(result, message);
-                                    Log.e(TAG, "getPictureById result: " + result + " message: " + message);
-                                    App.getInstance().getHandler().removeCallbacks(delayMessageRunable);
-                                    isStart = false;
-                                    switch (result) {
-                                        case 1:
-                                            stopGetAllPersonInfo();
-                                            List<String> pictures = MessageParser.getPictures(message);
-                                            RobotApi.getInstance().remoteDetect(0, "" + id, pictures, new CommandListener() {
-                                                @Override
-                                                public void onResult(int result, String message) {
-                                                    super.onResult(result, message);
-                                                    Log.e(TAG, "remoteDetect result: " + result + " message: " + message);
-                                                    String personName = MessageParser.getPersonName(message);
-                                                    boolean b = !TextUtils.isEmpty(personName);
-                                                    FaceSkill.getInstance().startFocusFollow(id, new ActionListener() {
-                                                        @Override
-                                                        public void onResult(int status, String responseString) throws RemoteException {
-                                                            super.onResult(status, responseString);
-                                                            Log.e(TAG, " REQUEST_TYPE_ASK onResult startFocusFollow " + status + ", " + responseString);
-                                                        }
 
-                                                        @Override
-                                                        public void onError(int errorCode, String errorString) throws RemoteException {
-                                                            super.onError(errorCode, errorString);
-                                                            Log.e(TAG, "REQUEST_TYPE_ASK onError startFocusFollow" + errorCode + ", " + errorString);
-                                                        }
-                                                    });
-                                                    if (b) {
-                                                        if (!isSpeaking) {
-                                                            isSpeaking = true;
-                                                            SpeechSkill.getInstance().getSkillApi().playText(NameUtils.getGetName(personName), new TextListener());
-                                                        }
-                                                    } else {
-                                                        int personError = MessageParser.getPersonError(message);
-                                                        if (personError == 1) {
-                                                            SpeechSkill.getInstance().getSkillApi().playText("我还不认识你了，你能告诉我吗", new TextListener());
-                                                        } else {
-                                                            SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", new TextListener());
-                                                        }
-                                                    }
-                                                }
-                                            });
-                                            break;
-                                        default:
-                                            SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", new TextListener());
-                                            break;
-                                    }
-                                }
-                            });
-                        }
-
-                        if (data.size() == 0 && !isStart) {
-                            isStart = true;
-                            App.getInstance().getHandler().postDelayed(delayMessageRunable, 3000);
-                        }
-
-                        Log.e(TAG, "2 startGetAllPersonInfo code : " + code + " onStatusUpdate: " + list.toString());
-                    }
-                };
-                RobotApi.getInstance().startGetAllPersonInfo(0, askPersonInfoListener);
+                break;
+            case Constants.REQUEST_TYPE_ASK:
+                managerPresenter.registerTypeAsk();
                 break;
             case Constants.REQUEST_TYPE_REGISTER:
                 RobotApi.getInstance().stopFocusFollow(0);
@@ -318,69 +231,12 @@ public class MessageManager {
 
         // 文字播报
         if (!TextUtils.isEmpty(answerText)) {
-//            if (!TextUtils.isEmpty(answerText) && answerText.contains("豹小秘")) {
-//                answerText = answerText.replace("豹小秘", getString(R.string.robot_name));
-//            }
-//
-//            if (!TextUtils.isEmpty(answerText) && answerText.contains("小豹")) {
-//                answerText = answerText.replace("小豹", getString(R.string.robot_name));
-//            }
-//
-//            if (!TextUtils.isEmpty(answerText) && answerText.contains("猎豹移动")) {
-//                answerText = answerText.replace("猎豹移动", getString(R.string.company_name));
-//            }
-//
-//            if (!TextUtils.isEmpty(userText) && FuzzyUtils.contains1(userText)) {
-//                answerText = getString(R.string.report_call);
-//            }
-//
-//            if (!TextUtils.isEmpty(userText) && userText.contains("你叫什么名字")) {
-//                answerText = "我叫小云，是知点云产品的智能助理";
-//            }
-//
-//            if (!TextUtils.isEmpty(answerText) && answerText.contains("接待机器人")) {
-//                if (answerText.contains("作为专业的接待机器人")) {
-//                    answerText = answerText.replace("接待机器人", "智能助理");
-//                } else {
-//                    answerText = "知点云产品的智能助理";
-//                }
-//            }
 
             if ("打开合影".equals(userText)) {
                 return;
             }
 
-            if (FuzzyUtils.contains10(userText)) {
-                return;
-            }
-
             loadData(userText);
-//            SpeechSkill.getInstance().playTxt(answerText, new TextListener() {
-//                @Override
-//                public void onComplete() {
-//                    super.onComplete();
-//
-//                    for (MessageCallBack messageCallBack : callbackList) {
-//                        messageCallBack.onComplete();
-//                    }
-//                }
-//            });
-        }
-    }
-
-    private void stopGetAllPersonInfo() {
-        if (askPersonInfoListener != null || wakeUpPersonInfoListener != null) {
-            if (askPersonInfoListener != null) {
-                RobotApi.getInstance().stopGetAllPersonInfo(0, askPersonInfoListener);
-                askPersonInfoListener = null;
-            }
-
-            if (wakeUpPersonInfoListener != null) {
-                RobotApi.getInstance().stopGetAllPersonInfo(0, wakeUpPersonInfoListener);
-                wakeUpPersonInfoListener = null;
-            }
-        } else {
-            RobotApi.getInstance().stopGetAllPersonInfo(0, null);
         }
     }
 
@@ -475,11 +331,4 @@ public class MessageManager {
         void findPeople();
     }
 
-    boolean isStart;
-    private Runnable delayMessageRunable = new Runnable() {
-        @Override
-        public void run() {
-            SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，我才能认识你", new TextListener());
-        }
-    };
 }
