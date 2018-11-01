@@ -40,6 +40,7 @@ public class RobotPersonInfo {
     private List<Person> personList;
     private Person mCurrentPerson;
     private Person mTrackingPerson;
+    private boolean isRespleep; //重新进入睡眠后
     private States mCurrentStates = States.IDLE;
     private MyPersonInfoListener personInfoListener = new MyPersonInfoListener();
 
@@ -53,6 +54,10 @@ public class RobotPersonInfo {
 
     private static class SingleHolder {
         public static final RobotPersonInfo INSTANCE = new RobotPersonInfo();
+    }
+
+    public void setRespleep(boolean respleep) {
+        isRespleep = respleep;
     }
 
     public Person getCurrentPerson() {
@@ -101,18 +106,28 @@ public class RobotPersonInfo {
             if (personList != null && personList.size() > 0) {
                 // 解析人脸信息
                 setPersonList(personList);
-                Log.d(TAG, "onData: code = " + code + ", size = " + personList.size() + ", id = " + mCurrentPerson.getId());
                 if (mCurrentPerson != null) {
+                    Log.d(TAG, "onData: code = " + code + ", size = " + personList.size() + ", id = " + mCurrentPerson.getId());
                     RobotApi.getInstance().stopGetAllPersonInfo(Constants.REQUEST_ID_DEFAULT, personInfoListener);
                     isStarting = false;
                     if (mCurrentStates == States.IDLE) {
                         Log.d(TAG, "onData: wakeup id " + mCurrentPerson.getId());
                         // 唤醒
+//                        MoveSkill.getInstance().motionArc(0, 0, mCurrentPerson.getAngle(), new CommandListener() {
+//                            @Override
+//                            public void onResult(int result, String message) {
+//                                super.onResult(result, message);
+//
+//                            }
+//                        });
+
+                        RobotApi.getInstance().stopWakeUp(0);
                         RobotApi.getInstance().wakeUp(Constants.REQUEST_ID_DEFAULT,
                                 mCurrentPerson.getAngle(), new ActionListener() {
                                     @Override
                                     public void onResult(int status, String responseString) throws RemoteException {
                                         Log.d(TAG, "onData: wakeup status " + status);
+                                        RobotApi.getInstance().stopWakeUp(0);
                                         if (status == Definition.RESULT_OK) {
                                             isSpeaking = false;
 
@@ -122,8 +137,16 @@ public class RobotPersonInfo {
                                             RobotApi.getInstance().stopFocusFollow(Constants.REQUEST_ID_DEFAULT);
                                             RobotApi.getInstance().startFocusFollow(Constants.REQUEST_ID_DEFAULT,
                                                     mTrackingPerson.getId(), 2000, 2, null);
-                                            if (robotWakeUpListener != null && !isFinding) {
-                                                isFinding = false;
+
+                                            if (!isRespleep) { //不是重新睡眠，唤醒就不在搜索人
+                                                return;
+                                            }
+
+                                            //不在睡眠期间
+                                            isRespleep = false;
+
+                                            if (robotWakeUpListener != null && !isFinding && mCurrentPerson != null) {
+                                                isFinding = true;
                                                 findPeople(mCurrentPerson.getId());
                                             }
                                         }
@@ -131,9 +154,11 @@ public class RobotPersonInfo {
 
                                     @Override
                                     public void onError(int errorCode, String errorString) throws RemoteException {
+                                        RobotApi.getInstance().stopWakeUp(0);
                                         mCurrentStates = States.IDLE;
                                     }
                                 });
+
                     } else {
                         Log.d(TAG, "onData: change focus id " + mCurrentPerson.getId());
                         // 停止焦点跟随
@@ -175,7 +200,7 @@ public class RobotPersonInfo {
                                 if (b) {
                                     if (!isSpeaking) {
                                         isSpeaking = true;
-                                        SpeechSkill.getInstance().getSkillApi().playText(NameUtils.getWakeUpName(personName), new TextListener());
+                                        SpeechSkill.getInstance().playTxt(NameUtils.getWakeUpName(personName), textListener);
                                         FaceSkill.getInstance().startFocusFollow(id, new ActionListener() {
                                             @Override
                                             public void onResult(int status, String responseString) throws RemoteException {
@@ -191,7 +216,7 @@ public class RobotPersonInfo {
                                         });
                                     }
                                 } else {
-                                    SpeechSkill.getInstance().playTxt("有什么可以帮到您的");
+                                    SpeechSkill.getInstance().playTxt("有什么可以帮到您的", textListener);
                                 }
 
                                 isFinding = false;
@@ -199,7 +224,7 @@ public class RobotPersonInfo {
                         });
                         break;
                     default:
-                        SpeechSkill.getInstance().playTxt("有什么可以帮到您的");
+                        SpeechSkill.getInstance().playTxt("有什么可以帮到您的", textListener);
                         isFinding = false;
                         break;
                 }
@@ -250,5 +275,48 @@ public class RobotPersonInfo {
 
     public interface RobotWakeUpListener {
         void wakeUp();
+    }
+
+    private TextListener textListener = new TextListener() {
+        @Override
+        public void onStart() {
+            if (speakingListener != null) {
+                speakingListener.onStart();
+            }
+        }
+
+        @Override
+        public void onStop() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+
+
+        @Override
+        public void onError() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+    };
+
+    private SpeakingListener speakingListener;
+
+    public void setSpeakingListener(SpeakingListener speakingListener) {
+        this.speakingListener = speakingListener;
+    }
+
+    public interface SpeakingListener {
+        void onStart();
+
+        void onStop();
     }
 }

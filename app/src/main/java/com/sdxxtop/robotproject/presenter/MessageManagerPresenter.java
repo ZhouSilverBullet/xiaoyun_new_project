@@ -3,7 +3,6 @@ package com.sdxxtop.robotproject.presenter;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Log;
-import android.widget.ScrollView;
 
 import com.ainirobot.coreservice.client.RobotApi;
 import com.ainirobot.coreservice.client.listener.ActionListener;
@@ -11,7 +10,7 @@ import com.ainirobot.coreservice.client.listener.CommandListener;
 import com.ainirobot.coreservice.client.listener.Person;
 import com.ainirobot.coreservice.client.listener.PersonInfoListener;
 import com.ainirobot.coreservice.client.listener.TextListener;
-import com.sdxxtop.robotproject.control.PersonInfo;
+import com.sdxxtop.robotproject.control.RobotPersonInfo;
 import com.sdxxtop.robotproject.global.App;
 import com.sdxxtop.robotproject.global.Constants;
 import com.sdxxtop.robotproject.skill.FaceSkill;
@@ -27,6 +26,11 @@ public class MessageManagerPresenter {
     public static final String TAG = "MessageManagerPresenter";
     private boolean isSpeaking;
     private boolean isStart;
+    private TextListener textListener;
+
+    public void setTextListener(TextListener textListener) {
+        this.textListener = textListener;
+    }
 
     private PersonInfoListener askPersonInfoListener;
     private PersonInfoListener wakeUpPersonInfoListener;
@@ -87,21 +91,21 @@ public class MessageManagerPresenter {
                                             if (b) {
                                                 if (!isSpeaking) {
                                                     isSpeaking = true;
-                                                    SpeechSkill.getInstance().getSkillApi().playText(NameUtils.getGetName(personName), new TextListener());
+                                                    SpeechSkill.getInstance().getSkillApi().playText(NameUtils.getGetName(personName), textListener);
                                                 }
                                             } else {
                                                 int personError = MessageParser.getPersonError(message);
                                                 if (personError == 1) {
-                                                    SpeechSkill.getInstance().getSkillApi().playText("我还不认识你了，你能告诉我吗", new TextListener());
+                                                    SpeechSkill.getInstance().getSkillApi().playText("我还不认识你了，你能告诉我吗", textListener);
                                                 } else {
-                                                    SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", new TextListener());
+                                                    SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", textListener);
                                                 }
                                             }
                                         }
                                     });
                                     break;
                                 default:
-                                    SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", new TextListener());
+                                    SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，再来一次", textListener);
                                     break;
                             }
                         }
@@ -125,7 +129,7 @@ public class MessageManagerPresenter {
     private Runnable delayMessageRunnable = new Runnable() {
         @Override
         public void run() {
-            SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，我才能认识你", new TextListener());
+            SpeechSkill.getInstance().getSkillApi().playText("您离我近一点，我才能认识你", textListener);
         }
     };
 
@@ -159,6 +163,7 @@ public class MessageManagerPresenter {
         RobotApi.getInstance().stopSearchPerson(0);
         RobotApi.getInstance().stopWakeUp(0);
         stopGetAllPersonInfo();
+        RobotApi.getInstance().stopMove(0, new CommandListener());
 
         final Integer angle = Integer.valueOf(param);
         Log.e(TAG, " exeRequest angle :" + angle);
@@ -169,7 +174,8 @@ public class MessageManagerPresenter {
                 switch (status) {
                     case 1:
                         RobotApi.getInstance().stopWakeUp(0);
-                        PersonInfo.getInstance().startSearchPerson();
+//                        PersonInfo.getInstance().startSearchPerson();
+                        RobotPersonInfo.getInstance().startSearchPerson();
                         break;
                 }
             }

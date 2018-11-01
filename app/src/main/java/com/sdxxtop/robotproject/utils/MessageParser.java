@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MessageParser {
-    private static final String TAG = MessageParser.class.getSimpleName();
+    private static final String TAG = "MessageParser";
     public static final String RESULT_OK = "ok";
     public static final String RESULT_FAILED = "failed";
     private static final float SWITCH_TRACKING_DISTANCE = 0.2f;
@@ -53,7 +53,7 @@ public class MessageParser {
             int id = newPerson.getId();
             double distance = newPerson.getDistance();
             int angle = newPerson.getAngle();
-            Log.d(TAG, "getAllPerson distance: " + distance
+            Log.e(TAG, "getAllPerson distance: " + distance
                     + ", id: " + id + ", angle: " + angle);
         }
         for (int i = 0; i < personList.size(); i++) {
@@ -136,6 +136,9 @@ public class MessageParser {
     }
 
     public static String parseResult(String message) {
+        if (checkJsonEmpty(message)) {
+            return "";
+        }
         try {
             JSONObject json = new JSONObject(message);
             return json.getString("status");
@@ -147,6 +150,9 @@ public class MessageParser {
 
 
     public static String parseRegisterName(String params) {
+        if (checkJsonEmpty(params)) {
+            return "";
+        }
         String name = "";
         if (TextUtils.isEmpty(params) || "[]".equals(params) || "{}".equals(params)) {
             return name;
@@ -177,6 +183,9 @@ public class MessageParser {
     }
 
     public static String getAnswerText(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         String answerText = "";
         try {
             if (TextUtils.isEmpty(json)) {
@@ -192,6 +201,9 @@ public class MessageParser {
     }
 
     public static String getUserText(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         String userText = "";
         try {
             JSONObject object = new JSONObject(json);
@@ -204,6 +216,9 @@ public class MessageParser {
     }
 
     public static String getDestination(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         String destination = "";
         try {
             JSONObject object = new JSONObject(json);
@@ -221,6 +236,9 @@ public class MessageParser {
     }
 
     public static String getMove(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         String destination = "";
         try {
             JSONObject object = new JSONObject(json);
@@ -238,6 +256,9 @@ public class MessageParser {
     }
 
     public static String getLocation(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         String destination = "";
         try {
             JSONObject object = new JSONObject(json);
@@ -256,6 +277,9 @@ public class MessageParser {
 
     public static List<String> getPictures(String json) {
         List<String> pictureList = new ArrayList<>();
+        if (checkJsonEmpty(json)) {
+            return pictureList;
+        }
         try {
             JSONObject object = new JSONObject(json);
             String status = object.optString("status");
@@ -274,6 +298,9 @@ public class MessageParser {
     }
 
     public static String getPersonName(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         try {
             JSONObject object = new JSONObject(json);
             String status = object.optString("message");
@@ -295,6 +322,9 @@ public class MessageParser {
      * @return
      */
     public static int getPersonError(String json) {
+        if (checkJsonEmpty(json)) {
+            return 1;
+        }
         try {
             JSONObject object = new JSONObject(json);
             String status = object.optString("message");
@@ -311,6 +341,9 @@ public class MessageParser {
     }
 
     public static String getRegisterRemoteName(String json) {
+        if (checkJsonEmpty(json)) {
+            return "";
+        }
         try {
             JSONObject object = new JSONObject(json);
             String remoteType = object.optString("register_remote_type");
@@ -327,5 +360,11 @@ public class MessageParser {
         return "";
     }
 
+    private static boolean checkJsonEmpty(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return true;
+        }
+        return false;
+    }
 
 }

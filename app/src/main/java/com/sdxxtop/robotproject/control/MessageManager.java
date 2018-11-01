@@ -9,21 +9,15 @@ import android.util.Log;
 
 import com.ainirobot.coreservice.client.RobotApi;
 import com.ainirobot.coreservice.client.listener.ActionListener;
-import com.ainirobot.coreservice.client.listener.CommandListener;
-import com.ainirobot.coreservice.client.listener.Person;
-import com.ainirobot.coreservice.client.listener.PersonInfoListener;
 import com.ainirobot.coreservice.client.listener.TextListener;
-import com.sdxxtop.robotproject.R;
 import com.sdxxtop.robotproject.global.App;
 import com.sdxxtop.robotproject.global.Constants;
 import com.sdxxtop.robotproject.presenter.MessageManagerPresenter;
 import com.sdxxtop.robotproject.skill.FaceSkill;
-import com.sdxxtop.robotproject.skill.MoveSkill;
-import com.sdxxtop.robotproject.skill.NavigationSkill;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
-import com.sdxxtop.robotproject.utils.FuzzyUtils;
+import com.sdxxtop.robotproject.socket.WebSocketControl;
+import com.sdxxtop.robotproject.socket.send.SendQuestionBean;
 import com.sdxxtop.robotproject.utils.MessageParser;
-import com.sdxxtop.robotproject.utils.NameUtils;
 import com.xuxin.entry.ChatWordBean;
 import com.xuxin.http.IRequestListener;
 import com.xuxin.http.Params;
@@ -40,7 +34,7 @@ import java.util.List;
  * @author Orion
  * @time 2018/9/14
  */
-public class MessageManager implements Handler.Callback {
+public class MessageManager implements Handler.Callback, WebSocketControl.ConnectListener {
 
     private final MessageManagerPresenter managerPresenter;
     private final Handler handler;
@@ -50,7 +44,9 @@ public class MessageManager implements Handler.Callback {
     private MessageManager() {
         callbackList = new ArrayList<>();
         managerPresenter = new MessageManagerPresenter();
+        managerPresenter.setTextListener(textListener);
         handler = new Handler(this);
+        WebSocketControl.getInstance().setConnectListener(this);
     }
 
     public static MessageManager getInstance() {
@@ -78,12 +74,12 @@ public class MessageManager implements Handler.Callback {
         String answerText = MessageParser.getAnswerText(param);
         String userText = MessageParser.getUserText(param);
 
-        if (wakeUpInterruptListener != null) {
-            wakeUpInterruptListener.onWakeUp();
-        }
-
         switch (type) {
             case Constants.REQUEST_TYPE_SPEECH:
+                if (wakeUpInterruptListener != null) {
+                    wakeUpInterruptListener.onWakeUp();
+                }
+
                 managerPresenter.requestTypeSpeechWakeup(param);
 
 //                RobotApi.getInstance().wakeUp(Constants.REQUEST_ID_DEFAULT, angle, new ActionListener() {
@@ -196,10 +192,10 @@ public class MessageManager implements Handler.Callback {
                                 switch (status) {
                                     case 1:
                                         String remoteName = MessageParser.getRegisterRemoteName(responseString);
-                                        SpeechSkill.getInstance().playTxt(remoteName);
+                                        SpeechSkill.getInstance().playTxt(remoteName,textListener);
                                         break;
                                     default:
-                                        SpeechSkill.getInstance().playTxt("录入失败，离我近一点，咱们再来一次");
+                                        SpeechSkill.getInstance().playTxt("录入失败，离我近一点，咱们再来一次",textListener);
                                         break;
                                 }
                             }
@@ -208,7 +204,7 @@ public class MessageManager implements Handler.Callback {
                             public void onError(int errorCode, String errorString) throws RemoteException {
                                 super.onError(errorCode, errorString);
                                 RobotApi.getInstance().stopRegister(0);
-                                SpeechSkill.getInstance().playTxt("录入失败");
+                                SpeechSkill.getInstance().playTxt("录入失败",textListener);
                                 Log.e(TAG, "startRegister onError: " + errorCode + ", " + errorString);
                             }
                         });
@@ -236,14 +232,33 @@ public class MessageManager implements Handler.Callback {
                 return;
             }
 
+//            loadData(userText);
+            loadToSocket(userText);
+        }
+    }
+
+    public synchronized void loadToSocket(String userText) {
+        if (WebSocketControl.getInstance().isOpen() && App.getInstance().isZuJianSwitch()) {
+            String value = SendQuestionBean.toSendQuestion(userText);
+            Log.e(TAG, "loadToSocket : " + value);
+            WebSocketControl.getInstance().sendMessage(value);
+        } else { //假设长连接失效了
             loadData(userText);
+        }
+    }
+
+    @Override
+    public void onMessage(String answer) {
+        Log.e(TAG, " MessageManager WebSocketControl : " + answer);
+        if (!TextUtils.isEmpty(answer)) {
+            payText(answer);
         }
     }
 
     public synchronized void loadData(String value) {
         Params params = new Params();
         params.put("it", value);
-        params.put("tp", 2);
+        params.put("tp", Constants.TYPE_PROJECT);
         String data = params.getData();
         Log.e(TAG, "params data = " + data);
         RequestExe.createRequest().postChatXiaoYun(data).enqueue(new RequestCallback<>(new IRequestListener<ChatWordBean>() {
@@ -271,8 +286,34 @@ public class MessageManager implements Handler.Callback {
     private void payText(String answerText) {
         SpeechSkill.getInstance().playTxt(answerText, new TextListener() {
             @Override
+            public void onStop() {
+                if (speakingListener != null) {
+                    speakingListener.onStop();
+                }
+            }
+
+            @Override
+            public void onStart() {
+                if (speakingListener != null) {
+                    speakingListener.onStart();
+                }
+                Log.e(TAG, "onStart: 开始");
+            }
+
+            @Override
+            public void onError() {
+                Log.e(TAG, "onError: 错误");
+                if (speakingListener != null) {
+                    speakingListener.onStop();
+                }
+            }
+
+            @Override
             public void onComplete() {
-                super.onComplete();
+                Log.e(TAG, "onComplete: 完成");
+                if (speakingListener != null) {
+                    speakingListener.onStop();
+                }
 
                 for (MessageCallBack messageCallBack : callbackList) {
                     messageCallBack.onComplete();
@@ -331,4 +372,46 @@ public class MessageManager implements Handler.Callback {
         void findPeople();
     }
 
+    private SpeakingListener speakingListener;
+
+    public void setSpeakingListener(SpeakingListener speakingListener) {
+        this.speakingListener = speakingListener;
+    }
+
+    public interface SpeakingListener {
+        void onStart();
+
+        void onStop();
+    }
+
+    private TextListener textListener = new TextListener() {
+        @Override
+        public void onStart() {
+            if (speakingListener != null) {
+                speakingListener.onStart();
+            }
+        }
+
+        @Override
+        public void onStop() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+
+
+        @Override
+        public void onError() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (speakingListener != null) {
+                speakingListener.onStop();
+            }
+        }
+    };
 }

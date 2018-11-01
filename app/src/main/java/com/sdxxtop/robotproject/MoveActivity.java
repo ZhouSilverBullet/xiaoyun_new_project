@@ -13,7 +13,7 @@ import com.sdxxtop.robotproject.presenter.iview.SkillView;
 import com.sdxxtop.robotproject.skill.MoveSkill;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
 
-public class MoveActivity extends AppCompatActivity implements SkillView {
+public class MoveActivity extends SecondBaseActivity {
 
     public static final String TAG = "MoveActivity";
     private MoveActivity mContext;
@@ -27,37 +27,37 @@ public class MoveActivity extends AppCompatActivity implements SkillView {
         App.getInstance().addView(this);
 
 
-        findViewById(R.id.move_place1).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MoveSkill.getInstance().goPosition(mContext, "大门");
-            }
-        });
-
-        findViewById(R.id.move_place2).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MoveSkill.getInstance().goPosition(mContext, "讲解台");
-            }
-        });
-        findViewById(R.id.move_place3).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MoveSkill.getInstance().goPosition(mContext, "展厅");
-            }
-        });
-        findViewById(R.id.move_place4).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MoveSkill.getInstance().goPosition(mContext, "待定");
-            }
-        });
-        findViewById(R.id.move_place5).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MoveSkill.getInstance().goPosition(mContext, "待定");
-            }
-        });
+//        findViewById(R.id.move_place1).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                MoveSkill.getInstance().goPosition(mContext, "大门");
+//            }
+//        });
+//
+//        findViewById(R.id.move_place2).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                MoveSkill.getInstance().goPosition(mContext, "讲解台");
+//            }
+//        });
+//        findViewById(R.id.move_place3).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                MoveSkill.getInstance().goPosition(mContext, "展厅");
+//            }
+//        });
+//        findViewById(R.id.move_place4).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                MoveSkill.getInstance().goPosition(mContext, "待定");
+//            }
+//        });
+//        findViewById(R.id.move_place5).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                MoveSkill.getInstance().goPosition(mContext, "待定");
+//            }
+//        });
     }
 
     @Override
@@ -72,7 +72,7 @@ public class MoveActivity extends AppCompatActivity implements SkillView {
         if (TextUtils.isEmpty(speechMessage)) {
             return;
         }
-
+        super.onSpeechParResult(speechMessage);
         if (speechMessage.contains("带我去大门")) {
             SpeechSkill.getInstance().playTxt("正在去往大门，跟我来吧！", new TextListener() {
                 @Override

@@ -1,8 +1,10 @@
 package com.sdxxtop.robotproject;
 
 import android.content.Intent;
+import android.graphics.drawable.AnimationDrawable;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
@@ -26,9 +28,18 @@ import com.sdxxtop.robotproject.presenter.iview.SkillView;
 import com.sdxxtop.robotproject.skill.MoveSkill;
 import com.sdxxtop.robotproject.skill.NavigationSkill;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
+import com.sdxxtop.robotproject.utils.FrameAnimationUtils;
 import com.sdxxtop.robotproject.utils.FuzzyUtils;
 import com.sdxxtop.robotproject.utils.MessageParser;
+import com.sdxxtop.robotproject.utils.ReportMediaPlayer;
+import com.sdxxtop.robotproject.utils.SkipSystemUtils;
 import com.sdxxtop.robotproject.widget.SiriView;
+import com.xuxin.entry.ChatWordBean;
+import com.xuxin.http.BaseModel;
+import com.xuxin.http.IRequestListener;
+import com.xuxin.http.Params;
+import com.xuxin.http.RequestCallback;
+import com.xuxin.http.RequestExe;
 
 public class MainActivity extends BaseActivity implements SkillView, Handler.Callback {
 
@@ -52,6 +63,8 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
     private TextView rainbowTextView;
     private MainActivity mContext;
     private Handler handler;
+
+    private boolean isResume;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,19 +128,55 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
         siriSpeakingView = findViewById(R.id.siri_speaking_view);
         rainbowTextView = findViewById(R.id.chat_text);
 
-        Glide.with(this).load(R.drawable.main_normal).into(sleepImage);
-        Glide.with(this).load(R.drawable.main_spking).into(speakingImage);
+//        Glide.with(this).load(R.drawable.main_normal).into(sleepImage);
+//        Glide.with(this).load(R.drawable.main_spking).into(speakingImage);
+
+        AnimationDrawable speakingAnimationDrawable = FrameAnimationUtils.getInstance().getDrawable(1);
+        sleepImage.setImageDrawable(speakingAnimationDrawable);
+        AnimationDrawable speakingAnimationDrawable2 = FrameAnimationUtils.getInstance().getDrawable(2);
+        speakingImage.setImageDrawable(speakingAnimationDrawable2);
 
         MessageManager.getInstance().setWakeUpInterruptListener(new MessageManager.WakeUpInterruptListener() {
             @Override
             public void onWakeUp() {
                 //只要导航被唤醒打断都不显示动嘴的笑脸
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        speakingLayout.setVisibility(View.INVISIBLE);
-                    }
-                });
+                speakingLayoutStatus(false);
+            }
+        });
+
+        MessageManager.getInstance().setSpeakingListener(new MessageManager.SpeakingListener() {
+            @Override
+            public void onStart() {
+                speakingLayoutStatus(true);
+            }
+
+            @Override
+            public void onStop() {
+                speakingLayoutStatus(false);
+            }
+        });
+
+        RobotPersonInfo.getInstance().setSpeakingListener(new RobotPersonInfo.SpeakingListener() {
+            @Override
+            public void onStart() {
+                speakingLayoutStatus(true);
+            }
+
+            @Override
+            public void onStop() {
+                speakingLayoutStatus(false);
+            }
+        });
+
+        ReportMediaPlayer.getInstance().setReportListener(new ReportMediaPlayer.ReportListener() {
+            @Override
+            public void onStart() {
+                speakingLayoutStatus(true);
+            }
+
+            @Override
+            public void onStop() {
+                speakingLayoutStatus(false);
             }
         });
 
@@ -137,6 +186,15 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
                 handler.removeMessages(100);
                 handler.sendEmptyMessageDelayed(100, SLEEP_CURRENT_TIME);
                 sleepLayout.setVisibility(View.INVISIBLE);
+                normalFrameAnimationStatus(false);
+            }
+        });
+
+        findViewById(R.id.main_root_layout).setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                longClick();
+                return false;
             }
         });
     }
@@ -163,7 +221,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        sleepLayout.setVisibility(View.GONE);
+//                        sleepLayout.setVisibility(View.GONE);
                         handler.removeMessages(100);
                         handler.removeMessages(START_SEARCH_PEOPLE);
                         handler.sendEmptyMessage(CONTROL_SLEEP_VISIBILITY);
@@ -177,6 +235,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
     @Override
     protected void onResume() {
         super.onResume();
+        isResume = true;
         handler.sendEmptyMessageDelayed(100, 5000);
         App.getInstance().addView(this);
         MessageManager.getInstance().setPause(false);
@@ -187,6 +246,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
     protected void onPause() {
         handler.removeMessages(100);
         super.onPause();
+        isResume = false;
         App.getInstance().removeView(this);
         MessageManager.getInstance().setPause(true);
 //        mainPresenter.removeView();
@@ -202,7 +262,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
             }
         });
 
-        RobotApi.getInstance().isRobotEstimate(0 ,new CommandListener() {
+        RobotApi.getInstance().isRobotEstimate(0, new CommandListener() {
             @Override
             public void onResult(int result, String message) {
                 super.onResult(result, message);
@@ -223,7 +283,7 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
 
     @Override
     public void onSpeechParResult(final String speechMessage) {
-        Log.e(TAG, "onSpeechParResult speechMessage " + speechMessage);
+//        Log.e(TAG, "onSpeechParResult speechMessage " + speechMessage);
         if (!TextUtils.isEmpty(speechMessage)) {
             Intent intent = null;
             if ("打开问答".equals(speechMessage) || "开启问答".equals(speechMessage)) {
@@ -297,15 +357,147 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
 //                });
 //            }
 
+            if (isResume) {
+                SkipSystemUtils.skip(this, speechMessage);
+            }
+
         }
 
-        if (sleepLayout.getVisibility() != View.VISIBLE) {
-            if (speechMessage.contains("小豹")) {
-                String tempSpeechMessage = speechMessage.replace("小豹", "小云");
-                rainbowTextView.setText(tempSpeechMessage);
-            } else {
-                rainbowTextView.setText(speechMessage);
+//        if (sleepLayout.getVisibility() != View.VISIBLE) {
+        if (speechMessage.contains("小豹")) {
+            String tempSpeechMessage = speechMessage.replace("小豹", "小云");
+            rainbowTextView.setText(tempSpeechMessage);
+        } else {
+            rainbowTextView.setText(speechMessage);
+        }
+//        }
+    }
+
+    public synchronized void loadKeywordData(String value) {
+        Params params = new Params();
+        params.put("it", value);
+        params.put("tp", Constants.TYPE_PROJECT);
+        String data = params.getData();
+        Log.e(TAG, "params data = " + data);
+        RequestExe.createRequest().postChatKeyword(data).enqueue(new RequestCallback<>(new IRequestListener<ChatWordBean>() {
+            @Override
+            public void onSuccess(ChatWordBean chatWordBean) {
+//                isRequesting = false;
+                ChatWordBean.DataEntry data = chatWordBean.getData();
+                Log.e(TAG, "data = " + data);
+                if (data != null) {
+                    String answer = data.getAnswer();
+                    if (!TextUtils.isEmpty(answer)) {
+                        payText(answer);
+                    }
+                }
             }
+
+            @Override
+            public void onFailure(int code, String errorMsg) {
+//                isRequesting = false;
+                Log.e(TAG, "code = " + code + " errorMsg = " + errorMsg);
+            }
+        }));
+    }
+
+    /**
+     * 控制视频播放
+     * @param controlType
+     */
+    public synchronized void loadChatVideoControl(int controlType) {
+        Params params = new Params();
+        params.put("tp", Constants.TYPE_PROJECT);
+        //(1:开始播放 2:暂停/停止播放 3:重新播放 4:全屏播放)
+        params.put("ct", controlType);
+        String data = params.getData();
+        Log.e(TAG, "params data = " + data);
+        RequestExe.createRequest().postChatVideo(data).enqueue(new RequestCallback<>(new IRequestListener<BaseModel>() {
+            @Override
+            public void onSuccess(BaseModel baseModel) {
+//                isRequesting = false;
+//                ChatWordBean.DataEntry data = chatWordBean.getData();
+                Log.e(TAG, "data = " + data);
+
+//                if (data != null) {
+//                    String answer = data.getAnswer();
+//                    if (!TextUtils.isEmpty(answer)) {
+//                        payText(answer);
+//                    }
+//                }
+            }
+
+            @Override
+            public void onFailure(int code, String errorMsg) {
+//                isRequesting = false;
+                Log.e(TAG, "code = " + code + " errorMsg = " + errorMsg);
+                SpeechSkill.getInstance().playTxt("视频控制失败"+ errorMsg);
+            }
+        }));
+    }
+
+    private void payText(String answerText) {
+        SpeechSkill.getInstance().playTxt(answerText, new TextListener() {
+            @Override
+            public void onStart() {
+                speakingLayoutStatus(true);
+                Log.e(TAG, "onStart: 开始");
+            }
+
+            @Override
+            public void onStop() {
+                speakingLayoutStatus(false);
+                Log.e(TAG, "onStop: 结束");
+            }
+
+            @Override
+            public void onError() {
+                speakingLayoutStatus(false);
+                Log.e(TAG, "onError: 错误");
+            }
+
+            @Override
+            public void onComplete() {
+                speakingLayoutStatus(false);
+                Log.e(TAG, "onComplete: 完成");
+            }
+        });
+    }
+
+    public void speakingLayoutStatus(final boolean visible) {
+        final int visibility = visible ? View.VISIBLE : View.INVISIBLE;
+        if (Thread.currentThread() == Looper.getMainLooper().getThread()) {
+            speakingLayout.setVisibility(visibility);
+            frameAnimationStatus(visible);
+            Log.e(TAG, "speakingLayoutStatus Looper visible : " + visible);
+        } else {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Log.e(TAG, "speakingLayoutStatus run visible : " + visible);
+                    speakingLayout.setVisibility(visibility);
+                    frameAnimationStatus(visible);
+                }
+            });
+        }
+    }
+
+    private void frameAnimationStatus(boolean visible) {
+        if (visible) {
+
+            FrameAnimationUtils.getInstance().start(2);
+        } else {
+            FrameAnimationUtils.getInstance().stop(2);
+        }
+    }
+
+    private void normalFrameAnimationStatus(boolean visible) {
+        if (visible) {
+            RobotPersonInfo.getInstance().setRespleep(false);
+            handler.removeMessages(START_SEARCH_PEOPLE);
+            FrameAnimationUtils.getInstance().start(1);
+        } else {
+            FrameAnimationUtils.getInstance().stop(1);
         }
     }
 
@@ -328,7 +520,39 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
             @Override
             public void run() {
                 speaking(false);
-                Log.e(TAG, "onStopSkill 判断是否是说话完毕 ");
+                String speechMessage = rainbowTextView.getText().toString();
+
+                if (speechMessage.contains("开始播报") || speechMessage.contains("开始播放")) {
+//                    Log.e(TAG, "Constants.content 开始播报: " + Constants.content.length());
+//                ReportMediaPlayer.getInstance().play();
+                    rainbowTextView.setText("");
+                    loadChatVideoControl(1);
+                } else if (speechMessage.contains("暂停播报") || speechMessage.contains("暂停播放")
+                        || speechMessage.contains("停止播报") || speechMessage.contains("停止播放")
+                        ) {
+//                    Log.e(TAG, "Constants.content 停止播报: " + Constants.content.length());
+                    rainbowTextView.setText("");
+                    loadChatVideoControl(2);
+//                ReportMediaPlayer.getInstance().pause();
+                } else if (speechMessage.contains("停止播报") || speechMessage.contains("继续播放")) {
+//                    Log.e(TAG, "Constants.content 停止播报: " + Constants.content.length());
+//                ReportMediaPlayer.getInstance().play();
+                    rainbowTextView.setText("");
+                    loadChatVideoControl(1);
+                } else if (speechMessage.contains("重新播报") || speechMessage.contains("重新播放")) {
+//                    Log.e(TAG, "Constants.content 重新播报: " + Constants.content.length());
+//                ReportMediaPlayer.getInstance().reset();
+                    rainbowTextView.setText("");
+                    loadChatVideoControl(3);
+                } else if (speechMessage.contains("全屏播报") || speechMessage.contains("全屏播放")) {
+//                    Log.e(TAG, "Constants.content 全屏播报: " + Constants.content.length());
+//                ReportMediaPlayer.getInstance().reset();
+                    rainbowTextView.setText("");
+                    loadChatVideoControl(4);
+                } else if (!TextUtils.isEmpty(speechMessage)) {
+                    loadKeywordData(speechMessage);
+                }
+
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -346,9 +570,15 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
         handler.removeMessages(START_SEARCH_PEOPLE);
         if (TextUtils.isEmpty(s)) {
             sleepLayout.setVisibility(View.VISIBLE);
-            handler.sendEmptyMessageDelayed(START_SEARCH_PEOPLE, 5000);
+            normalFrameAnimationStatus(true);
+//            speakingLayout.setVisibility(View.INVISIBLE);
+            if (isResume) {
+                handler.sendEmptyMessageDelayed(START_SEARCH_PEOPLE, 3000);
+            }
         } else {
-            sleepLayout.setVisibility(View.GONE);
+            sleepLayout.setVisibility(View.VISIBLE);
+            normalFrameAnimationStatus(true);
+//            sleepLayout.setVisibility(View.GONE);
         }
     }
 
@@ -372,13 +602,13 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
             startActivity(intent);
             return;
         }
-        sleepLayout.setVisibility(View.GONE);
+//        sleepLayout.setVisibility(View.GONE);
         switch (reqType) {
             case Definition.REQ_SPEECH_WAKEUP:
                 if (sleepLayout.getVisibility() == View.INVISIBLE) {
                     gridview.setAdapter(adapter);
                 }
-                sleepLayout.setVisibility(View.GONE);
+//                sleepLayout.setVisibility(View.GONE);
                 break;
             case Definition.REQ_SPEECH_SLEEP:
 
@@ -391,27 +621,9 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
                 break;
             case Constants.REQUEST_TYPE_GUIDE:
                 // 导航
-                if (!TextUtils.isEmpty(reqText)) {
-//                    if (reqText.contains("大门") || reqText.contains("电梯口") || reqText.contains("展厅")) {
-//                        String destination = MessageParser.getDestination(reqText);
-//                        navigation(destination);
-//                    }
-                    if (reqText.contains("带我去大门") || reqText.contains("去大门")) {
-                        navigation("大门");
-                    } else if (reqText.contains("带我去展厅") || reqText.contains("去展厅")) {
-                        navigation("展厅");
-                    } else if (reqText.contains("带我去电梯口") || reqText.contains("去电梯口")) {
-                        navigation("电梯口");
-                    } else if (reqText.contains("退出导航")) {
-                        handler.removeMessages(START_SEARCH_PEOPLE);
-                        RobotApi.getInstance().stopNavigation(0);
-                        SpeechSkill.getInstance().playTxt("退出导航成功", new TextListener() {
-                            @Override
-                            public void onComplete() {
-                                super.onComplete();
-                            }
-                        });
-                    }
+                String destination = MessageParser.getDestination(reqText);
+                if (!TextUtils.isEmpty(destination)) {
+                    navigation(destination);
                 }
                 break;
             default:
@@ -421,46 +633,25 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
     }
 
     private void navigation(String destinationName) {
-        handler.removeMessages(START_SEARCH_PEOPLE);
         NavigationSkill.getInstance().prepareStartNavigation(destinationName, new NavigationSkill.NavigationCallback() {
             @Override
             public void onNavigationStart() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        speakingLayout.setVisibility(View.VISIBLE);
-                    }
-                });
+                speakingLayoutStatus(true);
             }
 
             @Override
             public void onNavigationEnd() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        speakingLayout.setVisibility(View.INVISIBLE);
-                    }
-                });
+                speakingLayoutStatus(false);
             }
 
             @Override
             public void onNavigationSuccessStart() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        speakingLayout.setVisibility(View.VISIBLE);
-                    }
-                });
+                speakingLayoutStatus(true);
             }
 
             @Override
             public void onNavigationSuccessEnd() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        speakingLayout.setVisibility(View.INVISIBLE);
-                    }
-                });
+                speakingLayoutStatus(false);
             }
         });
     }
@@ -483,10 +674,13 @@ public class MainActivity extends BaseActivity implements SkillView, Handler.Cal
                 handler.sendEmptyMessageDelayed(100, SLEEP_CURRENT_TIME);
                 break;
             case CONTROL_SLEEP_VISIBILITY:
-                sleepLayout.setVisibility(View.GONE);
+//                sleepLayout.setVisibility(View.GONE);
                 break;
             case START_SEARCH_PEOPLE:
-                RobotPersonInfo.getInstance().startSearchPerson();
+                RobotPersonInfo.getInstance().setRespleep(true);
+                RobotApi.getInstance().stopFocusFollow(0);
+                RobotApi.getInstance().resetHead(0, new CommandListener());
+//                RobotPersonInfo.getInstance().startSearchPerson();
                 break;
         }
         return true;

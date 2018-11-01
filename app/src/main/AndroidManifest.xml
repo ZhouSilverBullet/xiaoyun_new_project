@@ -34,6 +34,7 @@
         android:icon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:largeHeap="true"
+        android:persistent="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:sharedUserId="android.uid.system"
         android:supportsRtl="true"
@@ -62,7 +63,11 @@
 
         <service android:name=".service.VoiceCallService" />
 
-        <activity android:name=".MoveActivity" />
+        <activity
+            android:name=".MoveActivity"
+            android:theme="@style/AppTheme.NoActionBar">
+
+        </activity>
         <activity android:name=".camera.CustomCameraActivity" />
         <activity
             android:name=".ImageViewActivity"

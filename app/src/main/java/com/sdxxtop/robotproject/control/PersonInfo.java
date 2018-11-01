@@ -23,7 +23,7 @@ import java.util.List;
  */
 public class PersonInfo {
 
-    private static final String TAG = "sdxxtop_PersonInfo";
+    private static final String TAG = "PersonInfo";
 
     public enum States {
         IDLE, WAKINGUP, NONE
@@ -95,8 +95,8 @@ public class PersonInfo {
             if (personList != null && personList.size() > 0) {
                 // 解析人脸信息
                 setPersonList(personList);
-                Log.d(TAG, "onData: code = " + code + ", size = " + personList.size() + ", id = " + mCurrentPerson.getId());
                 if (mCurrentPerson != null) {
+                    Log.d(TAG, "onData: code = " + code + ", size = " + personList.size() + ", id = " + mCurrentPerson.getId());
                     RobotApi.getInstance().stopGetAllPersonInfo(Constants.REQUEST_ID_DEFAULT, personInfoListener);
                     if (mCurrentStates == States.IDLE) {
                         Log.d(TAG, "onData: wakeup id " + mCurrentPerson.getId());
@@ -136,8 +136,8 @@ public class PersonInfo {
             } else {
                 Log.d(TAG, "onData: " + code + ", no person found.");
                 mCurrentStates = States.IDLE;
-                RobotApi.getInstance().stopFocusFollow(Constants.REQUEST_ID_DEFAULT);
-                RobotApi.getInstance().resetHead(Constants.REQUEST_ID_DEFAULT, null);
+//                RobotApi.getInstance().stopFocusFollow(Constants.REQUEST_ID_DEFAULT);
+//                RobotApi.getInstance().resetHead(Constants.REQUEST_ID_DEFAULT, null);
             }
         }
     }
@@ -151,13 +151,4 @@ public class PersonInfo {
         RobotApi.getInstance().startGetAllPersonInfo(Constants.REQUEST_ID_DEFAULT, personInfoListener);
     }
 
-    private boolean initSuccess;
-
-    public boolean isInitSuccess() {
-        return initSuccess;
-    }
-
-    public void setInitSuccess(boolean initSuccess) {
-        this.initSuccess = initSuccess;
-    }
 }

@@ -1,14 +1,19 @@
 package com.sdxxtop.robotproject.skill;
 
 import android.os.RemoteException;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.ainirobot.coreservice.client.Definition;
 import com.ainirobot.coreservice.client.RobotApi;
+import com.ainirobot.coreservice.client.actionbean.Pose;
 import com.ainirobot.coreservice.client.listener.ActionListener;
 import com.ainirobot.coreservice.client.listener.CommandListener;
 import com.ainirobot.coreservice.client.listener.TextListener;
 import com.sdxxtop.robotproject.global.Constants;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 /**
@@ -20,6 +25,7 @@ import com.sdxxtop.robotproject.global.Constants;
 public class NavigationSkill extends BaseSkill {
 
     private static final String TAG = "NavigationSkill";
+    private Pose mChargingPose;
 
     private NavigationSkill() {
     }
@@ -41,62 +47,38 @@ public class NavigationSkill extends BaseSkill {
                     @Override
                     public void onError(int errorCode, String errorString) throws RemoteException {
                         Log.e(TAG, "onError: " + errorCode + ", " + errorString);
-                        stopNavigation();
                         switch (errorCode) {
-                            case Definition.ERROR_NOT_ESTIMATE:
-                                playText("当前未定位");
-                                RobotApi.getInstance().isRobotEstimate(0 ,new CommandListener() {
-                                    @Override
-                                    public void onResult(int result, String message) {
-                                        super.onResult(result, message);
-                                        Log.d(TAG, "isRobotEstimate " + result + " , " + message);
-                                        switch (result) {
-                                            case Definition.RESULT_OK:
-                                                playText("定位成功" + message);
-                                                break;
-                                            default:
-                                                playText("定位失败" + message);
-                                                break;
-                                        }
-                                    }
-
-                                    @Override
-                                    public void onStatusUpdate(int status, String data) {
-                                        super.onStatusUpdate(status, data);
-                                        Log.d(TAG, "isRobotEstimate onStatusUpdate " + status + " , " + data);
-                                    }
-                                });
-//                                RobotApi.getInstance().resetEstimate(0, new CommandListener() {
-//                                    @Override
-//                                    public void onResult(int result, String message) {
-//                                        super.onResult(result, message);
-//                                        switch (result) {
-//                                            case Definition.RESULT_OK:
-//                                                playText("定位成功" + message);
-//                                                break;
-//                                            default:
-//                                                playText("定位失败" + message);
-//                                                break;
-//                                        }
-//                                    }
-//                                });
+                            case -116:
+                                Log.w(TAG, "startNavigation reqId:" + 0 + " error, not estimate!");
+                                playTTS("请先定位");
+//                                release(var2, 101, (Bundle)null);
                                 break;
-                            case Definition.ERROR_IN_DESTINATION:
-                                playText("已经在目的地范围，目标点范围通过参数设置");
+                            case -113:
+                                Log.w(TAG, "error in destination, reqId: " + 0 + " errorString: " + errorString);
+                                playTTS("这里就是" + destination);
                                 break;
-                            case Definition.ERROR_DESTINATION_NOT_EXIST:
-                                playText("目的地不存在");
+                            case -109:
+                                Log.w(TAG, "error destination can't arrive, reqId: " + 0 + " errorString: " + errorString);
+                                playTTS(destination + "无法到达");
                                 break;
-                            case Definition.ERROR_DESTINATION_CAN_NOT_ARRAIVE:
-                                playText("避障超时，目的地不能到达");
+                            case -108:
+                                Log.w(TAG, "error destination not exist, reqId: " + 0 + " errorString: " + errorString);
+                                playTTS("没有设定" + destination);
                                 break;
-                            case Definition.ACTION_RESPONSE_ALREADY_RUN:
-                                playText("当前Action正在运行");
+                            case -101:
+                                Log.w(TAG, "error resource locked, reqId: " + 0 + " errorString: " + errorString);
+                                playTTS("还未连接到底盘，请稍后再试");
                                 break;
-                            case Definition.ACTION_RESPONSE_REQUEST_RES_ERROR:
-                                playText("资源被占用");
+                            case -6:
+                            case -1:
+                                Log.w(TAG, "maybe other module is in navigation, reqId: " + 0 + " errorString: " + errorString);
+                                playTTS("我的腿动不了了, 请检查当前模式");
                                 break;
+                            default:
+                                Log.e(TAG, "startNavigation::onError() reqId: " + 0 + " unknown errorCode: " + errorCode + "  errorString: " + errorString);
                         }
+
+                        stopNavigation();
                     }
 
                     @Override
@@ -132,32 +114,49 @@ public class NavigationSkill extends BaseSkill {
                     public void onStatusUpdate(int status, String data) throws RemoteException {
                         Log.e(TAG, "onResult: " + status + ", " + data);
                         switch (status) {
+                            /**
+                             * 1015 ：Definition.STATUS_START_CRUISE 开始巡航
+                             * 1016 ：Definition.STATUS_GOAL_OCCLUDED 目标点被占用
+                             * 1017 ：Definition.STATUS_GOAL_OCCLUDED_END 目标点被占用结束
+                             * 1018 ：Definition.STATUS_NAVI_AVOID 障碍物堵住行进路线
+                             * 1019 ：Definition.STATUS_NAVI_AVOID_END 障碍物移除
+                             * 1021 ：Definition.STATUS_CRUISE_REACH_POINT 到达某一目标点，message为目标点下标
+                             */
+                            case Definition.STATUS_START_CRUISE:
+                                speechPlayText("请让一下");
+                                break;
                             case Definition.STATUS_GOAL_OCCLUDED:
-                                playText("目标点被占用");
+                                speechPlayText("请让一下");
                                 break;
                             case Definition.STATUS_GOAL_OCCLUDED_END:
-                                playText("目标点被占用，导航结束");
+                                speechPlayText("请让一下");
                                 break;
                             case Definition.STATUS_NAVI_AVOID:
-                                playText("障碍物堵住行进行路线");
+                                speechPlayText("请让一下");
                                 break;
                             case Definition.STATUS_NAVI_AVOID_END:
-                                playText("障碍物移除");
+                                speechPlayText("请让一下");
                                 break;
+                            case Definition.STATUS_CRUISE_REACH_POINT:
+                                speechPlayText("请让一下");
+                                break;
+//                            default:
+//                                speechPlayText("请让一下66");
+//                                break;
                         }
                     }
                 });
     }
 
-    public void playText(String speechValue) {
-        SpeechSkill.getInstance().playTxt(speechValue);
+    public void playTTS(String value) {
+        SpeechSkill.getInstance().playTxt(value);
     }
 
     public void prepareStartNavigation(final String destination, final NavigationCallback callback) {
         if (callback != null) {
             callback.onNavigationStart();
         }
-        SpeechSkill.getInstance().getSkillApi().playText("正在去往" + destination + "，跟我来吧！", new TextListener() {
+        SpeechSkill.getInstance().getSkillApi().playText("好的，正在前往" + destination + "，请跟我来吧！", new TextListener() {
             @Override
             public void onComplete() {
                 super.onComplete();
@@ -181,6 +180,7 @@ public class NavigationSkill extends BaseSkill {
                         Log.d(TAG, "onResult: " + result + ", " + message);
                         if (result == Definition.RESULT_OK) {
                             SpeechSkill.getInstance().playTxt("设置成功");
+                            RobotApi.getInstance().postSetPlaceToServer(0, param);
                         } else {
                             SpeechSkill.getInstance().playTxt("设置失败");
                         }
@@ -188,12 +188,83 @@ public class NavigationSkill extends BaseSkill {
                 });
     }
 
-    public void getLocation(String param, CommandListener listener) {
-        RobotApi.getInstance().getLocation(Constants.REQUEST_ID_DEFAULT, param, listener);
+    public void getLocation(String param) {
+        RobotApi.getInstance().getLocation(Constants.REQUEST_ID_DEFAULT, param, new CommandListener() {
+            public void onResult(int var1x, String var2) {
+                super.onResult(var1x, var2);
+                Log.i(TAG, "getLocation result:" + var1x + " message:" + var2);
+                switch (var1x) {
+                    case 0:
+                    case 2:
+                        SpeechSkill.getInstance().playTxt("没有设置充电桩位置");
+                        return;
+                    case 1:
+                        try {
+                            JSONObject var3 = new JSONObject(var2);
+                            if (mChargingPose == null) {
+                                mChargingPose = new Pose();
+                            }
+
+                            if (!var3.optBoolean("siteexist", false)) {
+                                SpeechSkill.getInstance().playTxt("没有设置充电桩位置");
+                                return;
+                            }
+
+                            mChargingPose.setX((float) var3.optDouble("px", 0.0D));
+                            mChargingPose.setY((float) var3.optDouble("py", 0.0D));
+                            mChargingPose.setTheta((float) var3.optDouble("theta", 0.0D));
+                            startRobotEstimate();
+                            return;
+                        } catch (JSONException var5) {
+                            var5.printStackTrace();
+                            SpeechSkill.getInstance().playTxt("没有设置充电桩位置");
+                            return;
+                        }
+                    default:
+                }
+            }
+        });
     }
 
     public void goPosition(String position, CommandListener listener) {
         RobotApi.getInstance().goPosition(Constants.REQUEST_ID_DEFAULT, position, listener);
+    }
+
+    private void speechPlayText(String value) {
+        SpeechSkill.getInstance().playTxt(value);
+    }
+
+    public void startRobotEstimate() {
+        RobotApi.getInstance().isRobotEstimate(Constants.REQUEST_ID_DEFAULT, new CommandListener() {
+            public void onResult(int var1, String var2) {
+                super.onResult(var1, var2);
+                Log.i(TAG, "isRobotEstimate result:" + var1 + " message:" + var2);
+                switch (var1) {
+                    case 0:
+                    case 2:
+                        speechPlayText("请让机器人背部朝向充电桩");
+//                        RepositionModule.this.showEstimateView(3);
+                        return;
+                    case 1:
+                        if (!TextUtils.isEmpty(var2) && "true".equals(var2)) {
+                            try {
+                                speechPlayText("定位状态正常，无需重定位");
+                                return;
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                return;
+                            }
+                        }
+
+                        speechPlayText("请让机器人背部朝向充电桩");
+//                        RepositionModule.this.showEstimateView(3);
+                        return;
+                    default:
+                        speechPlayText("请让机器人背部朝向充电桩");
+//                        RepositionModule.this.showEstimateView(3);
+                }
+            }
+        });
     }
 
     public void setPoseLocation(String param, CommandListener listener) {

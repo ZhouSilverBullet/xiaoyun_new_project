@@ -32,4 +32,12 @@ public interface ApiService {
     @POST("chat/xiaoyun")
     Call<ChatWordBean> postChatXiaoYun(@Field("data") String data);
 
+    @FormUrlEncoded
+    @POST("chat/keyword")
+    Call<ChatWordBean> postChatKeyword(@Field("data") String data);
+
+    @FormUrlEncoded
+    @POST("chat/video")
+    Call<BaseModel> postChatVideo(@Field("data") String data);
+
 }

@@ -47,4 +47,5 @@ public class Constants {
     public static final long START_NAVIGATION_TIME_OUT = 10 * 1000;
     public static final double COORDINATE_DEVIATION = 0.5;
 
+    public static final int TYPE_PROJECT = 2;
 }

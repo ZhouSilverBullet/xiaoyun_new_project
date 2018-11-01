@@ -1,9 +1,9 @@
 package com.sdxxtop.robotproject.global;
 
-import android.app.Application;
 import android.os.Handler;
 import android.os.Message;
 import android.os.RemoteException;
+import android.support.multidex.MultiDexApplication;
 import android.util.Log;
 
 import com.ainirobot.coreservice.client.ApiListener;
@@ -12,11 +12,10 @@ import com.ainirobot.coreservice.client.speech.SkillApi;
 import com.ainirobot.coreservice.client.speech.SkillCallback;
 import com.sdxxtop.robotproject.bean.SkillBean;
 import com.sdxxtop.robotproject.control.MessageManager;
-import com.sdxxtop.robotproject.control.PersonInfo;
-import com.sdxxtop.robotproject.control.RobotPersonInfo;
 import com.sdxxtop.robotproject.presenter.iview.SkillView;
 import com.sdxxtop.robotproject.service.ModuleCallback;
 import com.sdxxtop.robotproject.skill.SpeechSkill;
+import com.sdxxtop.robotproject.socket.WebSocketControl;
 import com.sdxxtop.robotproject.utils.Sources;
 import com.xuxin.configure.UtilSession;
 
@@ -30,7 +29,7 @@ import static com.sdxxtop.robotproject.ImageViewActivity.REFRESH;
  * Created by Administrator on 2018/9/16.
  */
 
-public class App extends Application implements Handler.Callback, MessageManager.MessageCallBack {
+public class App extends MultiDexApplication implements Handler.Callback, MessageManager.MessageCallBack {
     public static final String TAG = "App";
     private static App instance;
     private Handler handler;
@@ -40,12 +39,16 @@ public class App extends Application implements Handler.Callback, MessageManager
     public Runnable robotRunnable;
     public Runnable imgRefreshRunnable;
 
+    //竹间的长连接的控制开关
+    private boolean isZuJianSwitch;
+
     public static final int SKILL_INI_SUCCESS = 10;
     public static final int ROBOT_INI_SUCCESS = 11;
     private SkillApi skillApi;
     private MySkillCallback mSkillCallback = new MySkillCallback();
     private List<SkillView> skillViewList = new ArrayList<>(0);
     private ModuleCallback mModuleCallback;
+    private ApiListener apiListener;
 
     @Override
     public void onCreate() {
@@ -58,6 +61,13 @@ public class App extends Application implements Handler.Callback, MessageManager
         initRobot();
         MessageManager.getInstance().addCallBack(this);
         mModuleCallback = new ModuleCallback(this);
+        WebSocketControl.getInstance();
+    }
+
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        WebSocketControl.getInstance().disConnect();
     }
 
     private void initSkill() {
@@ -85,7 +95,7 @@ public class App extends Application implements Handler.Callback, MessageManager
     }
 
     private void initRobot() {
-        RobotController.getInstance().initRobotApi(this, new ApiListener() {
+        apiListener = new ApiListener() {
             @Override
             public void handleApiDisabled() {
                 Log.e(TAG, " RobotController handleApiDisabled ");
@@ -97,18 +107,16 @@ public class App extends Application implements Handler.Callback, MessageManager
                 isRobotInitSuccess = true;
                 handler.sendEmptyMessage(ROBOT_INI_SUCCESS);
                 RobotApi.getInstance().registerModule("default", Sources.getPatterns(instance), mModuleCallback);
-                PersonInfo.getInstance().startSearchPerson();
-                PersonInfo.getInstance().setInitSuccess(true);
-                RobotPersonInfo.getInstance();
-//                MessageManager.getInstance().startGetAllPersonInfo();
-
+//                WebSocketControl.getInstance();
             }
 
             @Override
             public void handleApiDisconnected() {
                 Log.e(TAG, " RobotController handleApiDisconnected ");
+//                RobotController.getInstance().initRobotApi(App.this, apiListener);
             }
-        });
+        };
+        RobotController.getInstance().initRobotApi(this, apiListener);
     }
 
     public Handler getHandler() {
@@ -252,5 +260,13 @@ public class App extends Application implements Handler.Callback, MessageManager
             handler.sendMessage(message);
             Log.d(TAG, "onQueryEnded: ");
         }
+    }
+
+    public void setZuJianSwitch(boolean zuJianSwitch) {
+        isZuJianSwitch = zuJianSwitch;
+    }
+
+    public boolean isZuJianSwitch() {
+        return isZuJianSwitch;
     }
 }

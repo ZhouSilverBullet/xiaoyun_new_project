@@ -27,7 +27,7 @@ import java.util.ArrayList;
 
 import retrofit2.http.PATCH;
 
-public class ChatActivity extends BaseActivity implements SkillView {
+public class ChatActivity extends SecondBaseActivity {
     private String TAG = "ChatActivity";
     private ListView chatList;
     private LinearLayout chatBackLayout;
@@ -190,6 +190,8 @@ public class ChatActivity extends BaseActivity implements SkillView {
     @Override
     public void onSpeechParResult(final String speechMessage) {
         Log.e(TAG, "mSkillCallback onSpeechParResult speechMessage = " + speechMessage + " thread : " + Thread.currentThread());
+        super.onSpeechParResult(speechMessage);
+
         if (speechMessage.contains("带我去大门")) {
             SpeechSkill.getInstance().playTxt("正在去往大门，跟我来吧！", new TextListener() {
                 @Override
